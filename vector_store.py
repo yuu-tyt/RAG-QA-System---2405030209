@@ -1,7 +1,7 @@
 import os
 from typing import List, Optional
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_ollama import OllamaEmbeddings
+from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain.schema import Document
 
@@ -13,7 +13,7 @@ class VectorStoreManager:
     
     def __init__(
         self,
-        embedding_model: str = "nomic-embed-text",
+        embedding_model: str = "all-MiniLM-L6-v2",
         persist_directory: str = "./chroma_db",
         chunk_size: int = 1000,
         chunk_overlap: int = 200
@@ -23,7 +23,7 @@ class VectorStoreManager:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         
-        self.embeddings = OllamaEmbeddings(model=embedding_model)
+        self.embeddings = SentenceTransformerEmbeddings(model_name=embedding_model)
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
