@@ -38,11 +38,17 @@ env/
 
 # ChromaDB
 chroma_db/
+test_chroma_db/
+test_chroma_db_new/
+test_chromadb_dir/
+test_chromadb_ollama/
+test_debug_db/
+
+# FAISS
+faiss_db/
 
 # Documents
-documents/
-*.pdf
-*.docx
+# Keep sample documents in the repository.
 
 # PyInstaller
 build/

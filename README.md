@@ -1,49 +1,71 @@
 # RAG问答系统
 
-基于本地知识库的智能问答系统，使用Ollama大模型、LangChain框架和ChromaDB向量数据库实现检索增强生成(RAG)功能。
-
 ## 项目简介
 
-本项目实现了一个完整的RAG问答系统，支持上传PDF/DOCX文档构建本地知识库，并通过大模型实现智能问答。系统采用Streamlit构建Web界面，支持多轮对话和会话记忆。
+本项目是一个基于本地知识库的 RAG 智能问答系统，支持上传 PDF/DOCX 文档、构建向量知识库，并基于文档内容进行问答。
+系统使用 Streamlit 构建 Web 界面，结合 Ollama 本地模型、LangChain 和 FAISS 实现检索增强生成。
 
-## 环境要求
+## 环境要求与安装步骤
 
-- Python 3.9+
-- Ollama (已安装并运行)
-- 至少8GB内存（运行7B模型）
+### 环境要求
 
-## 安装步骤
+- Python 3.9 或更高版本
+- Windows、Linux 或 macOS
+- Ollama 本地大模型服务
+- 建议内存 8GB 以上
 
-### 1. 安装Ollama
+### 1. 安装 Ollama
 
-**Windows:**
-1. 访问 [Ollama官网](https://ollama.ai) 下载Windows版本
-2. 运行安装程序
-3. 打开命令行，下载模型：
+访问 [Ollama 官网](https://ollama.com/) 下载并安装对应系统版本。
+
+安装完成后启动 Ollama 服务：
+
 ```bash
-ollama pull deepseek-r1:7b
+ollama serve
+```
+
+如果 Windows 终端找不到 `ollama` 命令，可以使用 Ollama 安装目录中的完整路径运行，或将 Ollama 添加到系统 PATH。
+
+### 2. 下载模型
+
+本项目默认使用更快的轻量问答模型 `qwen2.5:1.5b` 和嵌入模型 `nomic-embed-text`：
+
+```bash
+ollama pull qwen2.5:1.5b
 ollama pull nomic-embed-text
 ```
 
-**验证安装：**
+可选：如果希望使用推理能力更强但速度更慢的模型，也可以下载：
+
+```bash
+ollama pull deepseek-r1:7b
+```
+
+验证模型是否下载成功：
+
 ```bash
 ollama list
 ```
 
-### 2. 创建Python虚拟环境
+### 3. 创建并激活 Python 虚拟环境
 
 ```bash
-# 创建虚拟环境
 python -m venv venv
+```
 
-# 激活虚拟环境
-# Windows:
+Windows：
+
+```bash
 venv\Scripts\activate
-# Linux/Mac:
+```
+
+Linux/macOS：
+
+```bash
 source venv/bin/activate
 ```
 
-### 3. 安装依赖
+### 4. 安装依赖库
 
 ```bash
 pip install -r requirements.txt
@@ -51,39 +73,33 @@ pip install -r requirements.txt
 
 ## 使用说明
 
-### 1. 启动Ollama服务
+### 运行 Web 应用
 
-确保Ollama服务正在运行：
-```bash
-ollama serve
-```
-
-### 2. 测试Ollama连接
-
-```bash
-python test_ollama.py
-```
-
-### 3. 准备文档
-
-在项目目录下创建 `documents` 文件夹，放入PDF或DOCX格式的文档：
-```bash
-mkdir documents
-# 将文档复制到documents文件夹
-```
-
-### 4. 运行Web应用
+在项目根目录执行：
 
 ```bash
 streamlit run app.py
 ```
 
-### 5. 使用Web界面
+启动成功后，在浏览器打开：
 
-1. **上传文档**：在"文档管理"标签页上传PDF或DOCX文件
-2. **构建知识库**：点击"构建知识库"按钮处理文档
-3. **提问**：在"问答"标签页输入问题，获取基于知识库的回答
-4. **查看历史**：对话历史会自动保存，支持多轮对话
+```text
+http://localhost:8501
+```
+
+### 上传文档并构建知识库
+
+1. 打开 Web 页面后，先点击“初始化RAG系统”。
+2. 进入“文档管理”标签页。
+3. 上传 PDF 或 DOCX 文档，也可以使用项目内 `documents/` 文件夹中的样例文档。
+4. 点击“构建知识库”，系统会提取文本、切分文本块、生成向量并保存到本地向量库。
+
+### 提问
+
+1. 进入“问答”标签页。
+2. 在输入框中输入问题，例如“什么是自然语言处理？”。
+3. 系统会先检索知识库中的相关内容，再调用 Ollama 模型生成回答。
+4. 回答下方可展开查看参考来源。
 
 ### 命令行版本
 
@@ -91,110 +107,94 @@ streamlit run app.py
 python rag_chain.py
 ```
 
-## 关键技术点
+## 关键技术点说明
 
-### RAG流程
+### RAG 流程
 
-1. **文档处理**：使用PyPDF2和python-docx提取PDF和DOCX文档中的文本
-2. **文本分块**：使用RecursiveCharacterTextSplitter进行分块（chunk_size=1000, chunk_overlap=200）
-3. **向量化**：使用Ollama的nomic-embed-text模型生成文本嵌入
-4. **存储检索**：使用ChromaDB存储向量，支持相似度检索
-5. **问答生成**：使用LangChain的ConversationalRetrievalChain连接检索器和大模型
+1. 文档读取：使用 `PyPDF2` 提取 PDF 文本，使用 `python-docx` 提取 DOCX 文本。
+2. 文本切分：使用 LangChain 的 `RecursiveCharacterTextSplitter` 将长文档切分为文本块。
+3. 向量嵌入：调用 Ollama 的 `nomic-embed-text` 模型生成文本向量。
+4. 向量存储：使用 FAISS 保存本地向量索引，支持相似度检索。
+5. 检索问答：根据用户问题检索相关文本块，将检索结果作为上下文交给大语言模型生成答案。
 
 ### 所用模型
 
-- **大语言模型**：deepseek-r1:7b（可替换为qwen2:7b）
-- **嵌入模型**：nomic-embed-text（Ollama内置）
+- 问答模型：`qwen2.5:1.5b`
+- 备用问答模型：`deepseek-r1:7b`
+- 嵌入模型：`nomic-embed-text`
 
-### 系统提示词
+### 嵌入方式
 
-```
-你是一个专业的问答助手。请基于提供的参考文档回答用户问题。
+系统通过 `langchain_ollama.OllamaEmbeddings` 调用本地 Ollama 嵌入模型，将文本块转换为向量后写入 FAISS 索引。
 
-重要规则：
-1. 只使用参考文档中的信息回答问题
-2. 如果参考文档中没有相关信息，请明确回答："文档中未找到相关答案"
-3. 回答要准确、简洁、有条理
-4. 如果引用文档内容，请注明来源
-5. 不要编造或推测答案
-```
+### 性能优化
+
+- 默认使用 `qwen2.5:1.5b`，比 7B 推理模型响应更快。
+- 使用 `keep_alive="10m"` 保持模型热加载，减少连续提问等待时间。
+- 问答流程采用一次检索和一次模型生成，减少链路调用开销。
+
+## 项目效果截图
+
+### Web 首页
+
+![Web 首页](截图文件/图片1.png)
+
+### 文档管理与上传
+
+![文档管理与上传](截图文件/图片2.png)
+
+### 知识库构建结果
+
+![知识库构建结果](截图文件/图片3.png)
+
+### 问答示例
+
+![问答示例](截图文件/图片4.png)
+
+## 测试问答效果
+
+| 测试问题 | 预期效果 |
+| --- | --- |
+| 什么是自然语言处理？ | 基于知识库回答 NLP 的定义 |
+| NLP 有哪些主要应用领域？ | 从文档中总结 NLP 应用 |
+| 什么是词向量？ | 解释词向量概念 |
+| Transformer 模型的优势是什么？ | 总结 Transformer 相关优势 |
+| 今天的天气怎么样？ | 如果文档无相关信息，应提示文档中未找到相关答案 |
 
 ## 项目结构
 
-```
+```text
 RAG-QA-System/
-├── app.py                  # Streamlit Web应用
-├── rag_chain.py            # RAG问答链（命令行版本）
-├── vector_store.py         # 向量数据库管理
-├── document_processor.py   # 文档处理模块
-├── test_ollama.py          # Ollama API测试脚本
-├── requirements.txt        # 依赖列表
-├── README.md               # 项目说明
-├── .gitignore              # Git忽略配置
-├── documents/              # 文档目录（需自行创建）
-└── chroma_db/              # 向量数据库（自动生成）
+├── app.py                    # Streamlit Web 应用
+├── rag_chain.py              # RAG 问答流程
+├── vector_store.py           # FAISS 向量库管理
+├── vector_store_chromadb.py  # ChromaDB 向量库实验版本
+├── document_processor.py     # PDF/DOCX 文档处理
+├── requirements.txt          # 依赖库列表
+├── README.md                 # 项目说明
+├── documents/                # 文档样例
+├── 截图文件/                 # 项目截图
+└── test_*.py                 # 测试脚本
 ```
 
-## 打包为EXE
-
-使用PyInstaller打包：
+## 打包为 EXE
 
 ```bash
 pyinstaller --onefile --add-data "documents;documents" app.py
 ```
 
-打包后的exe文件位于 `dist/` 目录。
-
-**注意**：目标电脑需要安装Ollama并下载相应模型。
-
-## 测试问答效果
-
-### 相关问题测试（5个）
-
-| 问题 | 回答质量 |
-|------|----------|
-| 什么是自然语言处理？ | ✓ 准确回答 |
-| NLP有哪些主要应用领域？ | ✓ 准确回答 |
-| 什么是词向量？ | ✓ 准确回答 |
-| Transformer模型的优势是什么？ | ✓ 准确回答 |
-| 如何评价一个NLP模型的性能？ | ✓ 准确回答 |
-
-### 无关问题测试（2个）
-
-| 问题 | 回答质量 |
-|------|----------|
-| 今天的天气怎么样？ | ✓ 正确回复"文档中未找到相关答案" |
-| 如何制作红烧肉？ | ✓ 正确回复"文档中未找到相关答案" |
+打包后的文件位于 `dist/` 目录。目标电脑仍需要安装 Ollama 并下载对应模型。
 
 ## 已知问题与改进方向
 
-### 已知问题
+- 大模型首次响应需要加载模型到内存，首问可能较慢。
+- PDF 中的图片和复杂表格暂未做结构化解析。
+- 后续可增加 TXT、Markdown 等更多文档格式支持。
+- 后续可增加知识库增量更新、文档删除和置信度评分。
 
-1. 大模型首次响应可能较慢（需要加载模型到内存）
-2. PDF文档中的表格和图片无法提取
-3. 长文档处理可能消耗较多内存
+## AI 使用声明
 
-### 改进方向
-
-1. 添加更多文档格式支持（如TXT、Markdown）
-2. 实现知识库的增量更新和删除
-3. 添加回答的置信度评分
-4. 支持多用户和权限管理
-5. 优化长文档的处理效率
-
-## AI使用声明
-
-本项目使用Trae AI编程辅助工具进行开发，以下部分由AI辅助生成：
-- 文档处理模块（document_processor.py）
-- 向量数据库管理（vector_store.py）
-- RAG问答链（rag_chain.py）
-- Streamlit界面（app.py）
-- 测试脚本（test_ollama.py）
-
-AI辅助主要用于：
-- 代码骨架生成
-- API调用方式参考
-- 错误调试和优化建议
+本项目使用 Trae AI 编程辅助工具进行开发和调试，辅助内容包括文档处理、向量库管理、RAG 问答链、Streamlit 页面和测试脚本。
 
 ## 许可证
 

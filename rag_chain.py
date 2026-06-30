@@ -1,9 +1,4 @@
 from typing import List, Dict, Optional
-from langchain_ollama import OllamaLLM
-from langchain.chains import ConversationalRetrievalChain
-from langchain.memory import ConversationBufferMemory
-from langchain.schema import Document
-from vector_store import VectorStoreManager
 
 class RAGQASystem:
     """
@@ -13,45 +8,64 @@ class RAGQASystem:
     
     def __init__(
         self,
-        llm_model: str = "deepseek-r1:7b",
+        llm_model: str = "qwen2.5:1.5b",
         embedding_model: str = "nomic-embed-text",
-        persist_directory: str = "./chroma_db"
+        persist_directory: str = "./faiss_db"
     ):
         self.llm_model = llm_model
         self.embedding_model = embedding_model
         self.persist_directory = persist_directory
         
-        self.vector_manager = VectorStoreManager(
-            embedding_model=embedding_model,
-            persist_directory=persist_directory
-        )
-        
-        self.llm = OllamaLLM(model=llm_model)
-        
-        self.memory = ConversationBufferMemory(
-            memory_key="chat_history",
-            return_messages=True,
-            output_key="answer"
-        )
-        
-        self.qa_chain: Optional[ConversationalRetrievalChain] = None
+        # 延迟初始化
+        self.vector_manager = None
+        self.llm = None
+        self.memory = None
+        self.qa_chain = None
     
     def initialize(self) -> bool:
         """
         初始化系统，加载向量数据库
         AI生成：使用Trae辅助编写
         """
-        if self.vector_manager.load_vectorstore():
-            self._build_qa_chain()
-            return True
-        return False
+        try:
+            # 延迟导入和初始化
+            from langchain_ollama import OllamaLLM
+            from langchain.memory import ConversationBufferMemory
+            from vector_store import VectorStoreManager
+            
+            self.vector_manager = VectorStoreManager(
+                embedding_model=self.embedding_model,
+                persist_directory=self.persist_directory
+            )
+            
+            self.llm = OllamaLLM(
+                model=self.llm_model,
+                temperature=0.1,
+                num_predict=512,
+                num_ctx=4096,
+                keep_alive="10m"
+            )
+            
+            self.memory = ConversationBufferMemory(
+                memory_key="chat_history",
+                return_messages=True,
+                output_key="answer"
+            )
+            
+            if self.vector_manager.load_vectorstore():
+                self._build_qa_chain()
+                return True
+            return False
+        except Exception as e:
+            print(f"初始化失败: {str(e)}")
+            return False
     
     def _build_qa_chain(self):
         """
         构建问答链
         AI生成：使用Trae辅助编写
         """
-        if self.vector_manager.vectorstore is None:
+        if self.vector_manager is None or self.vector_manager.vectorstore is None:
             print("向量数据库未加载")
             return
         
@@ -71,22 +85,7 @@ class RAGQASystem:
 
 请基于以上参考文档回答："""
 
-        from langchain.prompts import PromptTemplate
-        
-        prompt = PromptTemplate(
-            template=system_prompt,
-            input_variables=["context", "question"]
-        )
-        
-        self.qa_chain = ConversationalRetrievalChain.from_llm(
-            llm=self.llm,
-            retriever=self.vector_manager.vectorstore.as_retriever(
-                search_kwargs={"k": 3}
-            ),
-            memory=self.memory,
-            return_source_documents=True,
-            combine_docs_chain_kwargs={"prompt": prompt}
-        )
+        self.qa_chain = system_prompt
         
         print("RAG问答链构建完成")
     
@@ -95,6 +94,10 @@ class RAGQASystem:
         构建知识库
         AI生成：使用Trae辅助编写
         """
+        if self.vector_manager is None:
+            print("请先初始化系统")
+            return 0
+        
         count = self.vector_manager.build_vectorstore(documents)
         if count > 0:
             self._build_qa_chain()
@@ -112,18 +115,28 @@ class RAGQASystem:
             }
         
         try:
-            result = self.qa_chain({"question": question})
+            docs = self.vector_manager.vectorstore.similarity_search(question, k=2)
+            context = "\n\n".join(
+                f"[来源: {doc.metadata.get('filename', '未知')}]\n{doc.page_content}"
+                for doc in docs
+            )
+            
+            prompt = self.qa_chain.format(context=context, question=question)
+            answer = self.llm.invoke(prompt)
             
             sources = []
-            if "source_documents" in result:
-                for doc in result["source_documents"]:
-                    sources.append({
-                        "filename": doc.metadata.get("filename", "未知"),
-                        "content": doc.page_content[:200] + "..."
-                    })
+            for doc in docs:
+                sources.append({
+                    "filename": doc.metadata.get("filename", "未知"),
+                    "content": doc.page_content[:200] + "..."
+                })
+            
+            if self.memory is not None:
+                self.memory.chat_memory.add_user_message(question)
+                self.memory.chat_memory.add_ai_message(answer)
             
             return {
-                "answer": result.get("answer", "无法获取答案"),
+                "answer": answer,
                 "sources": sources
             }
         except Exception as e:
@@ -137,6 +150,9 @@ class RAGQASystem:
         获取对话历史
         AI生成：使用Trae辅助编写
         """
+        if self.memory is None:
+            return []
+        
         history = []
         messages = self.memory.chat_memory.messages
         for i in range(0, len(messages), 2):
@@ -152,15 +168,18 @@ class RAGQASystem:
         清空对话历史
         AI生成：使用Trae辅助编写
         """
-        self.memory.clear()
-        print("对话历史已清空")
+        if self.memory:
+            self.memory.clear()
+            print("对话历史已清空")
     
     def get_chunk_count(self) -> int:
         """
         获取知识库文本块数量
         AI生成：使用Trae辅助编写
         """
-        return self.vector_manager.get_chunk_count()
+        if self.vector_manager:
+            return self.vector_manager.get_chunk_count()
+        return 0
 
 
 def main():
